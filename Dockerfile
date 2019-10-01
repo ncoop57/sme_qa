@@ -6,7 +6,7 @@ ARG USER_GID=$USER_UID
 
 ADD ./requirements.txt .
 
-RUN apt install git wget -y
+#RUN apt install git wget -y
 RUN pip install -r requirements.txt
 #fastai sentencepiece pandas numpy image jupyterthemes
 RUN jt -t chesterish
