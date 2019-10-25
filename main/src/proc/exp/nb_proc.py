@@ -5,6 +5,7 @@
 # file to edit: dev_nb/proc.ipynb
 
 from pathlib import Path
+from fastai.text import *
 
 import pandas as pd
 import sentencepiece as sp
@@ -26,6 +27,46 @@ class SentencePiece:
         self.mdl_path = mdl_path
         self.s = sp.SentencePieceProcessor()
         self.s.Load(str(mdl_path))
+        self.vocab = [self.s.IdToPiece(id) for id in range(self.s.GetPieceSize())]
 
     def tokenize(self, inpt):
         return self.s.EncodeAsPieces(inpt)
+
+def merge_cols(df):
+    merged = [''.join(x) for x in zip(df["query"], df["res"])]
+    new_df = pd.DataFrame({"merged": merged})
+
+    return new_df
+
+def conv_to_ds(df, data_path, bs = 64):
+#     print(df.head(5))
+    return (TextList
+            .from_df(df, data_path,
+                     processor = SPProcessor(
+                         sp_model = data_path/"merged/model.model",
+                         sp_vocab = data_path/"merged/model.vocab"
+                     ))
+            .split_none()
+            .label_for_lm()
+            .databunch(bs = bs)
+           ).train_ds
+
+def gen_lm_data(df_trn, df_val, task_name, data_path, bs = 64, sample = 1):
+    if task_name != "merged":
+        df_trn = tag_task(df_trn, task_name)
+        df_val = tag_task(df_val, task_name)
+
+    df_trn = df_trn.sample(frac = sample)
+    df_val = df_val.sample(frac = sample)
+
+    df_trn = merge_cols(df_trn)
+    df_val = merge_cols(df_val)
+
+    ds_trn = conv_to_ds(df_trn, data_path)
+    ds_val = conv_to_ds(df_val, data_path)
+
+    data = TextLMDataBunch.create(
+        train_ds = ds_trn, valid_ds = ds_val, path = data_path, bs = bs
+    )
+
+    return data
