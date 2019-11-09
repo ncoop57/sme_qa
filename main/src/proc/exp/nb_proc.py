@@ -49,7 +49,7 @@ def conv_to_ds(df, data_path, bs = 64):
             .split_none()
             .label_for_lm()
             .databunch(bs = bs)
-           ).train_ds
+           )
 
 def gen_lm_data(df_trn, df_val, task_name, data_path, bs = 64, sample = 1):
     if task_name != "merged":
@@ -62,11 +62,14 @@ def gen_lm_data(df_trn, df_val, task_name, data_path, bs = 64, sample = 1):
     df_trn = merge_cols(df_trn)
     df_val = merge_cols(df_val)
 
-    ds_trn = conv_to_ds(df_trn, data_path)
-    ds_val = conv_to_ds(df_val, data_path)
+    db_trn = conv_to_ds(df_trn, data_path)
+    db_val = conv_to_ds(df_val, data_path)
 
     data = TextLMDataBunch.create(
-        train_ds = ds_trn, valid_ds = ds_val, path = data_path, bs = bs
+        train_ds = db_trn.train_ds, valid_ds = db_val.train_ds, path = data_path, bs = bs
     )
+
+    data.label_list = db_trn.label_list
+    data.label_list.valid = db_val.label_list.train
 
     return data
