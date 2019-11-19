@@ -4,6 +4,9 @@
 #################################################
 # file to edit: dev_nb/evaluation.ipynb
 
+# imports
+from fastai.text import *
+
 # Evaluation metrics for vulnerability detection - Accuracy, Precision, Recall
 def eval_vuln(mdl, tst):
     tps, tns, fps, fns = 0, 0, 0, 0
@@ -130,12 +133,20 @@ def eval_txt(mdl, ds):
     b1, b2, b3, b4 = [], [], [], []
     meteor = []
     rouge_l = []
+    preds = []
+    tokenizer = Tokenizer()
     for inpt, lbl in zip(ds["query"], ds["res"]):
         tok_len = len(sp.EncodeAsPieces(inpt))
         if tok_len > 1024:
             continue
 
-        pred = get_res(mdl, inpt, n_toks = 10)
+        pred = get_res(mdl, inpt, n_toks = 600)
+
+        tokens = tokenizer.process_all([lbl])
+        print(tokens)
+        lbl = ' '.join(tokens[0])
+        print(lbl)
+        preds.append(pred)
         # bleu 1-4
         b1.append(eval_bleu1([lbl], pred))
         b2.append(eval_bleu2([lbl], pred))
@@ -146,13 +157,13 @@ def eval_txt(mdl, ds):
         meteor.append(eval_meteor([lbl], pred))
 
         # rouge
-        rouge_l.append(eval_rougeL([lbl], pred))
+        rouge_l.append(eval_rougeL_single_ref([lbl], pred))
 
-    return b1, b2, b3, b4, meteor, rouge_l
+    return b1, b2, b3, b4, meteor, rouge_l, preds
 
 # Grabs entire model's response up until special xxbos token,
 # i.e. once model begins a new sentence we consider the model finished with its answer.
-def get_res(mdl, inpt, n_toks = 1_000):
+def get_res(mdl, inpt, sp, n_toks = 1_000):
     res = mdl.predict(inpt, n_toks, temperature=0.75).split(" ")
     res = sp.DecodePieces(res).split(" ")
     try:
