@@ -38,6 +38,18 @@ def split_data(df):
 
     return df_trn, df_val, df_tst
 
+def split_causal_data(df, trn_splt = 0.8, val_splt = 0.1, tst_splt = 0.1):
+    df_sz = len(df)
+    trn_indx = int(df_sz * trn_splt)
+    val_indx = int(df_sz * val_splt)
+
+    df_trn = df.loc[:trn_indx]
+    df_val = df.loc[(trn_indx + 1):(trn_indx + val_indx)]
+    df_tst = df.loc[(trn_indx + val_indx + 1):]
+
+    return df_trn, df_val, df_tst
+
+
 def save_splits(dfs, output_path):
     """Save split of DataFrames into corresponding training, validation, and testing csv files."""
     dfs[0].to_csv(output_path/'trn.csv', index=False)
@@ -54,7 +66,10 @@ def save_dfs(df, output_path):
     # save splits
     save_splits((df_trn, df_val, df_tst), output_path)
 
-tags = {"mthds_cmts": "<$comment$>", "so_posts": "<$qa$>", "code_smell": "<$dirty$>"}
+tags = {
+    "mthds_cmts": "<$comment$>", "so_posts": "<$qa$>",
+    "code_smell": "<$dirty$>", "buggy": "<$bug$>"
+}
 def tag_task(df, task_name):
     """Adds special tag to the end of the query based on the type of task."""
     new_query = list(map(lambda x: x + tags[task_name], df["query"]))

@@ -8,12 +8,14 @@
 from fastai.text import *
 
 # Evaluation metrics for vulnerability detection - Accuracy, Precision, Recall
-def eval_vuln(mdl, tst):
+def eval_vuln(mdl, tst, sp):
     tps, tns, fps, fns = 0, 0, 0, 0
-    print("Hello World")
+    tot = 0
     for inpt, lbl in zip(tst["query"], tst["res"]):
-        print(lbl)
-        pred = mdl.predict(inpt, 1, temperature=0.75)
+        tok_len = len(sp.EncodeAsPieces(inpt))
+        if tok_len > 1024:
+            continue
+        pred = get_res(mdl, inpt, sp, n_toks = 10)
         if lbl == "yes":
             if pred == lbl:
                 tps += 1
@@ -23,9 +25,12 @@ def eval_vuln(mdl, tst):
                 tns += 1
             else: fps += 1
 
-    acc   = (tps + tns) / len(tst)
-    prec  = tps / (tps + fps)
-    recal = tps / (tps + fns)
+        tot += 1
+        torch.cuda.empty_cache()
+
+    acc   = (tps + tns) / tot
+    prec  = tps / (tps + fps) if (tps + fps) != 0 else 0.
+    recal = tps / (tps + fns) if (tps + fns) != 0 else 0.
 
     return acc, prec, recal
 
@@ -129,7 +134,7 @@ def eval_rougeL(reference_texts: List[str], generated_text: str):
     return result_df
 
 
-def eval_txt(mdl, ds):
+def eval_txt(mdl, ds, sp):
     b1, b2, b3, b4 = [], [], [], []
     meteor = []
     rouge_l = []
@@ -140,13 +145,12 @@ def eval_txt(mdl, ds):
         if tok_len > 1024:
             continue
 
-        pred = get_res(mdl, inpt, n_toks = 600)
+        pred = get_res(mdl, inpt, sp, n_toks = 600)
 
         tokens = tokenizer.process_all([lbl])
-        print(tokens)
         lbl = ' '.join(tokens[0])
-        print(lbl)
-        preds.append(pred)
+        preds.append((pred, lbl))
+
         # bleu 1-4
         b1.append(eval_bleu1([lbl], pred))
         b2.append(eval_bleu2([lbl], pred))
@@ -157,9 +161,9 @@ def eval_txt(mdl, ds):
         meteor.append(eval_meteor([lbl], pred))
 
         # rouge
-        rouge_l.append(eval_rougeL_single_ref([lbl], pred))
+#         rouge_l.append(eval_rougeL_single_ref([lbl], pred))
 
-    return b1, b2, b3, b4, meteor, rouge_l, preds
+    return b1, b2, b3, b4, meteor, preds
 
 # Grabs entire model's response up until special xxbos token,
 # i.e. once model begins a new sentence we consider the model finished with its answer.
