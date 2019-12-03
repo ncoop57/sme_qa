@@ -8,14 +8,11 @@
 from fastai.text import *
 
 # Evaluation metrics for vulnerability detection - Accuracy, Precision, Recall
-def eval_vuln(mdl, tst, sp):
+def eval_vuln(mdl, tst, sp, task, max_toks):
     tps, tns, fps, fns = 0, 0, 0, 0
     tot = 0
     for inpt, lbl in zip(tst["query"], tst["res"]):
-        tok_len = len(sp.EncodeAsPieces(inpt))
-        if tok_len > 1024:
-            continue
-        pred = get_res(mdl, inpt, sp, n_toks = 10)
+        pred = get_clas_res(mdl, "xxbos " + inpt, sp, task, n_toks = max_toks)
         if lbl == "yes":
             if pred == lbl:
                 tps += 1
@@ -134,21 +131,19 @@ def eval_rougeL(reference_texts: List[str], generated_text: str):
     return result_df
 
 
-def eval_txt(mdl, ds, sp):
+def eval_txt(mdl, ds, sp, task, max_toks):
     b1, b2, b3, b4 = [], [], [], []
     meteor = []
     rouge_l = []
+    levenshtein = []
+    cosine = []
+    jaccard = []
     preds = []
     tokenizer = Tokenizer()
     for inpt, lbl in zip(ds["query"], ds["res"]):
-        tok_len = len(sp.EncodeAsPieces(inpt))
-        if tok_len > 1024:
-            continue
+        pred = get_seq_res(mdl, "xxbos " + inpt, sp, task, n_toks = max_toks)
 
-        pred = get_res(mdl, inpt, sp, n_toks = 600)
-
-        tokens = tokenizer.process_all([lbl])
-        lbl = ' '.join(tokens[0])
+        lbl = ' '.join(lbl.split())
         preds.append((pred, lbl))
 
         # bleu 1-4
@@ -160,21 +155,125 @@ def eval_txt(mdl, ds, sp):
         # meteor
         meteor.append(eval_meteor([lbl], pred))
 
-        # rouge
-#         rouge_l.append(eval_rougeL_single_ref([lbl], pred))
+        # Levenshtein
+        levenshtein.append(levenshtein_distance_score(lbl, pred))
 
-    return b1, b2, b3, b4, meteor, preds
+        # Similarities
+        cosine.append(get_cosine_sim(lbl, pred))
+        jaccard.append(get_jaccard_sim(lbl, pred))
+
+        # rouge
+        rouge_l.append(eval_rougeL_single_ref([lbl], pred))
+
+    return b1, b2, b3, b4, meteor, rouge_l, levenshtein, cosine, jaccard, preds
 
 # Grabs entire model's response up until special xxbos token,
 # i.e. once model begins a new sentence we consider the model finished with its answer.
-def get_res(mdl, inpt, sp, n_toks = 1_000):
-    res = mdl.predict(inpt, n_toks, temperature=0.75).split(" ")
-    res = sp.DecodePieces(res).split(" ")
+def get_res(mdl, inpt, sp, task, n_toks = 1_000, greedy = False):
+    if greedy:
+        res = mdl.beam_search(inpt, n_words = n_toks, beam_sz = 1, top_k = 1).split(" ")
+        res = sp.DecodePieces(res).split(" ")[1:]
+    else:
+        res = mdl.predict(inpt, n_toks, temperature=0.75).split(" ")
+        res = sp.DecodePieces(res).split(" ")
+
     try:
         end_res = res.index("xxbos")
     except:
         end_res = len(res) - 1
 
-    res = " ".join(res[:end_res])[len(inpt.replace(" ", '')):]
+    res = " ".join(res[:end_res])
+    res = res[res.find(task) + len(task):]
 
     return res
+
+# Grabs entire model's response up until special xxbos token for a sequence task,
+# i.e. once model begins a new sentence we consider the model finished with its answer.
+def get_seq_res(mdl, inpt, sp, task, n_toks = 1_000):
+    res = mdl.predict(inpt, n_toks, temperature=0.75).split(" ")
+    res = sp.DecodePieces(res).replace(task, " ").split(" ")[1:]
+
+    try:
+        end_res = res.index("xxbos")
+    except:
+        end_res = len(res) - 1
+
+    res = decode_spec_tokens(res[:end_res])
+    res = " ".join(res[:end_res])
+
+    return res
+
+# Grabs entire model's response up until special xxbos token for a classification task,
+# i.e. once model begins a new sentence we consider the model finished with its answer.
+def get_clas_res(mdl, inpt, sp, task, n_toks = 10):
+    res = mdl.beam_search(inpt, n_words = n_toks, beam_sz = 1, top_k = 1).split(" ")
+    res = sp.DecodePieces(res).split(" ")[2:]
+
+    try:
+        end_res = res.index("xxbos")
+    except:
+        end_res = len(res) - 1
+
+    res = " ".join(res[:end_res])
+    res = res[res.find(task) + len(task):]
+
+    return res
+
+# priya
+
+from collections import Counter
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+
+from collections import Counter
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+
+def _get_vectors(*strs):
+    text = [t for t in strs]
+    vectorizer = CountVectorizer(text)
+    vectorizer.fit(text)
+    return vectorizer.transform(text).toarray()
+
+def get_cosine_sim(reference_txt:str, generated_txt:str):
+    vectors = [t for t in _get_vectors(reference_txt, generated_txt)]
+    return round(cosine_similarity(vectors[0:1], vectors)[0][1],4)
+
+# priya
+
+from nltk.stem.wordnet import WordNetLemmatizer
+from nltk import word_tokenize
+from nltk.corpus import wordnet
+lmtzr = WordNetLemmatizer()
+
+def _get_wordnet_pos(treebank_tag):
+
+    if treebank_tag.startswith('J'):
+        return wordnet.ADJ
+    elif treebank_tag.startswith('V'):
+        return wordnet.VERB
+    elif treebank_tag.startswith('N'):
+        return wordnet.NOUN
+    elif treebank_tag.startswith('R'):
+        return wordnet.ADV
+    else:
+        return wordnet.NOUN
+
+def _lemmatizeSentence(strr):
+    return ([lmtzr.lemmatize(word.lower(), _get_wordnet_pos(word)) for word in word_tokenize(strr)])
+
+def get_jaccard_sim(str1, str2):
+    a = set(_lemmatizeSentence(str1))
+    b = set(_lemmatizeSentence(str2))
+    c = a.intersection(b)
+    return round(float(len(c)) / (len(a) + len(b) - len(c)),4)
+
+
+# # baaler metric.
+
+# !pip install editdistance
+import editdistance
+
+def levenshtein_distance_score(reference_txt: str, generated_txt: str):
+    return round(editdistance.eval(reference_txt.split(), generated_txt.split()), 4)

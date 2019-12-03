@@ -12,6 +12,10 @@ import sentencepiece as sp
 
 import csv
 
+# import sys
+# sys.path.append("../")
+from src.prep.exp.nb_prep import *
+
 def df_to_txt_file(df, output):
     with open(output/'text.txt', 'w') as f:
         f.write('\n'.join(list(merged_trn_df["query"]) + list(merged_trn_df["res"])))
