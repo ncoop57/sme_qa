@@ -6,6 +6,7 @@
 
 # imports
 from fastai.text import *
+from tqdm import tqdm
 
 # Evaluation metrics for vulnerability detection - Accuracy, Precision, Recall
 def eval_vuln(mdl, tst, sp, task, max_toks):
@@ -136,36 +137,39 @@ def eval_txt(mdl, ds, sp, task, max_toks):
     meteor = []
     rouge_l = []
     levenshtein = []
-    cosine = []
+#     cosine = []
     jaccard = []
     preds = []
     tokenizer = Tokenizer()
-    for inpt, lbl in zip(ds["query"], ds["res"]):
+    for inpt, lbl in tqdm(list(zip(ds["query"], ds["res"]))):
         pred = get_seq_res(mdl, "xxbos " + inpt, sp, task, n_toks = max_toks)
 
         lbl = ' '.join(lbl.split())
         preds.append((pred, lbl))
 
+        low_lbl = lbl.lower()
+        low_pred = pred.lower()
+
         # bleu 1-4
-        b1.append(eval_bleu1([lbl], pred))
-        b2.append(eval_bleu2([lbl], pred))
-        b3.append(eval_bleu3([lbl], pred))
-        b4.append(eval_bleu4([lbl], pred))
+        b1.append(eval_bleu1([low_lbl], low_pred))
+        b2.append(eval_bleu2([low_lbl], low_pred))
+        b3.append(eval_bleu3([low_lbl], low_pred))
+        b4.append(eval_bleu4([low_lbl], low_pred))
 
         # meteor
-        meteor.append(eval_meteor([lbl], pred))
+        meteor.append(eval_meteor([low_lbl], low_pred))
 
         # Levenshtein
-        levenshtein.append(levenshtein_distance_score(lbl, pred))
+        levenshtein.append(levenshtein_distance_score(low_lbl, low_pred))
 
         # Similarities
-        cosine.append(get_cosine_sim(lbl, pred))
-        jaccard.append(get_jaccard_sim(lbl, pred))
+#         cosine.append(get_cosine_sim(low_lbl, low_pred))
+        jaccard.append(get_jaccard_sim(low_lbl, low_pred))
 
         # rouge
-        rouge_l.append(eval_rougeL_single_ref([lbl], pred))
+        rouge_l.append(eval_rougeL_single_ref([low_lbl], low_pred))
 
-    return b1, b2, b3, b4, meteor, rouge_l, levenshtein, cosine, jaccard, preds
+    return b1, b2, b3, b4, meteor, rouge_l, levenshtein, jaccard, preds
 
 # Grabs entire model's response up until special xxbos token,
 # i.e. once model begins a new sentence we consider the model finished with its answer.
