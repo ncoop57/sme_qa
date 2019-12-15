@@ -1,3 +1,4 @@
+# sme_qa
 # RealmFit Replication Repository
 
 - [RealmFit Replication Repository](#realmfit-replication-repository)
@@ -52,9 +53,10 @@ The processing steps include cleaning all html tags except <code></code> tags.
 
 Then, the data is saved in (query, response) format in csv file.
 
-Our version of CSV files are provided under `data.zip/so` directory in this [link](https://drive.google.com/drive/folders/1sQeS4KYrSla83GOqzuwo-eGGdFX9d7gM?usp=sharing). 
+Our version of CSV files are provided under `data.zip/so` directory. 
 
 ## Data Acquisition: Buggy/Non Buggy Code
+<Nathan, F1>
 
 The buggy/non buggy data was collected from Tufano et al.'s paper [An Empirical Study on Learning Bug-Fixing Patches in the
 Wild via Neural Machine Translation](https://arxiv.org/pdf/1812.08693.pdf). The preprocessing that was done included:
@@ -63,7 +65,7 @@ Wild via Neural Machine Translation](https://arxiv.org/pdf/1812.08693.pdf). The 
 
 All the steps are available under [main/src/prep/prep.ipynb](main/src/prep/prep.ipynb) file.
 
-The exact data used is provided into splits of training, validation, and testing  once the data.zip file is downloaded under `data.zip/buggy` directory in this [link](https://drive.google.com/drive/folders/1sQeS4KYrSla83GOqzuwo-eGGdFX9d7gM?usp=sharing)..
+The exact data used is provided into splits of training, validation, and testing  once the data.zip file is downloaded under `data.zip/buggy` directory.
 
 
 ## Data Acquisition: Comments
@@ -79,7 +81,7 @@ All these steps are available under [main/src/prep/prep.ipynb](main/src/prep/pre
 
 All the data are spilt into training, validation and testing set at 80-10-10 ratio.
 
-Our version of CSV files are provided under `data.zip/mthds_cmts` directory in this [link](https://drive.google.com/drive/folders/1sQeS4KYrSla83GOqzuwo-eGGdFX9d7gM?usp=sharing).
+Our version of CSV files are provided under `data.zip/mthds_cmts` directory.
 
 ## Building Vocabulary
 
@@ -91,9 +93,7 @@ These are done in [main/src/proc.ipynb](main/src/proc.ipynb) file.
 To train model such as awd_lstm, we load the data as dataframe. Futhermore, the vocabulary model is also loaded. We determine a batch size of 8 which allows faster parallel processing without shutting down the server. Then, we use FastAI language_model_learner to train the model. While doing that, we rely on FastAI's learning rate finder to establish a learning rate, which we determine to be $5e^-4$. For learning, we also define two callbacks. One callback is to save model every time the performance is improved. The other callback is to stop the training when validation loss starts going up. For the validation loss,establish patience as 3, which means it will train for at least 3 epochs, and a min-delta of 0.01; which means it will accept validation loss at a 0.01 level. The performance metric here is accuracy. 
 These details are available under `main/nbs/mdling/`. For example, awd_lstm is available under [main/nbs/mdling/awd_lstm/awd_lstm.ipynb](main/nbs/mdling/awd_lstm/awd_lstm.ipynb).
 
-Our version of CSV files are provided under `data.zip/buggy` directory in this [link](https://drive.google.com/drive/folders/1sQeS4KYrSla83GOqzuwo-eGGdFX9d7gM?usp=sharing).
-
-Furthermore, all the trained models are also provided under `models.zip` file in this [link](https://drive.google.com/drive/folders/1sQeS4KYrSla83GOqzuwo-eGGdFX9d7gM?usp=sharing).
+Our version of CSV files are provided under `data.zip/buggy` directory.
 
 ## Hardware Used
 All experiments and model training was done on two Linux servers. The server configurations are as follows:  
